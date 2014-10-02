@@ -1,12 +1,84 @@
-import fdb
 import fdb.fbcore
-from ello.ini import ini
 
-database = ini.read('Dados', 'DataBase')
-con = fdb.connect(database, 'sysdba', 'masterkey')
-cursor = con.cursor()
+class Database(object):
 
-chain = []
+    def __init__(self, dbconn):
+        self.dbconn = dbconn
+        self.cursor = dbconn.cursor()
+
+    def dropAllProcedures(self):
+        for record in self.procedures():
+            self.dropObject(record[0], 5)
+
+    def dropAllTriggers(self):
+        for record in self.triggers():
+            self.dropObject(record[0], 2)
+
+    def dropAllViews(self):
+        for record in self.views():
+            self.dropObject(record[2], 1)
+
+    def procedures(self):
+        """ Retorna a lista de procedures no banco de dados
+        """
+        self.cursor.execute('SELECT a.RDB$PROCEDURE_NAME '
+                            'FROM RDB$PROCEDURES a')
+        return self.cursor.fetchall()
+
+    def triggers(self):
+        """ Retorna a lista de triggers no banco de dados
+        """
+        self.cursor.execute("SELECT a.RDB$TRIGGER_NAME "
+                            "FROM RDB$TRIGGERS a "
+                            "WHERE RDB$SYSTEM_FLAG=0")
+        return self.cursor.fetchall()
+
+    def views(self):
+        """ Retorna a lista de views no banco de dados
+        """
+        self.cursor.execute("SELECT a.RDB$RELATION_ID, a.RDB$FIELD_ID, a.RDB$RELATION_NAME "
+                            "FROM RDB$RELATIONS a "
+                            "WHERE "
+                            "    RDB$SYSTEM_FLAG=0"
+                            "    and ((RDB$RELATION_TYPE=1) "
+                            "    or ((RDB$RELATION_TYPE IS NULL) AND (RDB$RELATION_NAME LIKE 'V%')))")
+        views = self.cursor.fetchall()
+        #views.append((0, 0, 'VSPDCONTADOR')) # estagiario aprova!
+        return views
+
+    def dropObject(self, name, ttype):
+        object_name = name.strip()
+        object_types = { 1 : 'VIEW', 2 : 'TRIGGER', 5 : 'PROCEDURE' }
+        for dname, dtype in self.getDependencies(object_name):
+            dname = dname.strip()
+            if dname==object_name: continue
+            self.dropObject(dname, dtype) 
+
+        sql = 'DROP {0} {1}'.format(object_types[ttype], object_name)
+        try:
+            self.cursor.execute(sql)
+            self.dbconn.commit()
+        except fdb.fbcore.DatabaseError, e:
+            self.dbconn.rollback()
+            return False
+        print "-> {0}".format(sql)
+        f = open('d:/script.sql', 'a')
+        print >>f, "{0};".format(sql)
+        f.close()
+        return True
+
+    def getDependencies(self, object_name):
+        """ Retorna a lista de dependencias de um objeto
+        """
+        sql = ("select a.RDB$DEPENDENT_NAME, a.RDB$DEPENDENT_TYPE "
+               "FROM RDB$DEPENDENCIES a                           "
+               "WHERE                                             "
+               "    a.RDB$DEPENDED_ON_TYPE IN (1,2,5)             "
+               "    AND a.RDB$DEPENDED_ON_NAME='%s'               " % object_name)
+        self.cursor.execute(sql)
+        dependencies = self.cursor.fetchall()
+        return dependencies
+
 
 class Field(object):
 
@@ -66,75 +138,6 @@ class Table:
             field.nullable = null
 
             self.fields.append(field)
-
-def dropObject(name, ttype):
-    pname = name.strip()
-    object_types = { 1 : 'VIEW', 2 : 'TRIGGER', 5 : 'PROCEDURE' }
-    print "  "*len(chain), 'DROP', object_types[ttype], pname
-    sql = 'DROP %s %s' % (object_types[ttype], pname)
-    cursor.execute(sql)
-    try:
-        con.commit()
-        
-        # gravar script
-        f = open('d:/script.sql', 'a')
-        f.write('%s;\n' % sql)
-        f.close()
-
-        return True
-    except fdb.fbcore.DatabaseError, e:
-        con.rollback()
-        chain.append(pname)
-        for dname, dtype in getDependencies(pname):
-            dname = dname.strip()
-            if dname==pname: continue
-            if dname in chain: continue
-            if dropObject(dname, dtype) and len(chain)>0:
-                chain.pop()
-
-def getDependencies(object_name):
-    """ Retorna a lista de dependencias de um objeto
-    """
-    sql = ("select a.RDB$DEPENDENT_NAME, a.RDB$DEPENDENT_TYPE "
-           "FROM RDB$DEPENDENCIES a                           "
-           "WHERE                                             "
-           "    a.RDB$DEPENDED_ON_TYPE IN (1,2,5)             "
-           "    AND a.RDB$DEPENDED_ON_NAME='%s'               " % object_name)
-    cursor.execute(sql)
-    dependencies = cursor.fetchall()
-    return dependencies
-
-
-def procedures():
-    """ Retorna a lista de procedures no banco de dados
-    """
-    cursor.execute('SELECT a.RDB$PROCEDURE_NAME FROM RDB$PROCEDURES a')
-    return cursor.fetchall()
-
-def triggers():
-    cursor.execute("""\
-SELECT 
-    a.RDB$TRIGGER_NAME 
-FROM RDB$TRIGGERS a
-WHERE RDB$SYSTEM_FLAG=0
-""")
-    return cursor.fetchall()
-
-def views():
-    sql = """SELECT 
-        a.RDB$RELATION_ID, 
-        a.RDB$FIELD_ID, 
-        a.RDB$RELATION_NAME
-    FROM RDB$RELATIONS a
-    WHERE
-        RDB$SYSTEM_FLAG=0
-        and ((RDB$RELATION_TYPE=1) 
-            or ((RDB$RELATION_TYPE IS NULL) AND (RDB$RELATION_NAME LIKE 'V%')))
-        """
-    cursor.execute(sql)
-    views = cursor.fetchall()
-    views.append((0, 0, 'VSPDCONTADOR')) # estagiario aprova!
-    return views
 
 def deleteForeignKeys():
     cursor.execute( "select r.rdb$relation_name, r.rdb$constraint_name "
