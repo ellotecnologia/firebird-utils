@@ -1,18 +1,15 @@
+import sys
+import fdb
 import firebird
 
-def dropAllProcedures():
-    for record in firebird.procedures():
-        firebird.dropObject(record[0], 5)
+def main(database_path):
+    conn = fdb.connect(database_path, 'sysdba', 'masterkey')
+    cursor = conn.cursor()
+    database = firebird.Database(conn)
 
-def dropAllTriggers():
-    for record in firebird.triggers():
-        firebird.dropObject(record[0], 2)
+    database.dropAllTriggers()
+    database.dropAllViews()
+    database.dropAllProcedures()
 
-def dropAllViews():
-    for record in firebird.views():
-        firebird.dropObject(record[2], 1)
-
-dropAllProcedures()
-dropAllTriggers()
-dropAllViews()
-
+if __name__=="__main__":
+    main(sys.argv[1])
