@@ -18,6 +18,18 @@ class Database(object):
         for record in self.views():
             self.dropObject(record[2], 1)
 
+    def tables(self):
+        """ Returns a list of available tables.
+        """
+        self.cursor.execute("SELECT rdb$relation_name "
+                            "FROM rdb$relations "
+                            "WHERE "
+                            "   rdb$view_blr is null "
+                            "   AND (rdb$system_flag IS NULL OR rdb$system_flag=0) "
+                            "ORDER by rdb$relation_name")
+        for tablename, in self.cursor:
+            yield Table(self.dbconn, tablename)
+
     def procedures(self):
         """ Retorna a lista de procedures no banco de dados
         """
@@ -43,7 +55,6 @@ class Database(object):
                             "    and ((RDB$RELATION_TYPE=1) "
                             "    or ((RDB$RELATION_TYPE IS NULL) AND (RDB$RELATION_NAME LIKE 'V%')))")
         views = self.cursor.fetchall()
-        #views.append((0, 0, 'VSPDCONTADOR')) # estagiario aprova!
         return views
 
     def dropObject(self, name, ttype):
@@ -62,10 +73,12 @@ class Database(object):
             self.dbconn.rollback()
             return False
         print "-> {0}".format(sql)
-        f = open('d:/script.sql', 'a')
-        print >>f, "{0};".format(sql)
-        f.close()
+        self.do_save_instruction("{0};".format(sql))
         return True
+
+    def do_save_instruction(self, stmt):
+        if self.save_instruction_func:
+            self.save_instruction_func(stmt)
 
     def getDependencies(self, object_name):
         """ Retorna a lista de dependencias de um objeto
@@ -91,15 +104,20 @@ class Field(object):
 class Table:
 
     _field_types = {
-        'LONG': 'INTEGER',
-        'VARYING': 'VARCHAR',
-        'INT64': 'DECIMAL',
-        'DATE': 'DATE',
-        'SHORT': 'SMALLINT',
-        'TEXT': 'CHAR'
+        'SHORT'     : 'SMALLINT',
+        'LONG'      : 'INTEGER',
+        'INT64'     : 'DECIMAL',
+        'FLOAT'     : 'FLOAT',
+        'VARYING'   : 'VARCHAR',
+        'DATE'      : 'DATE',
+        'TEXT'      : 'CHAR',
+        'BLOB'      : 'BLOB',
+        'TIME'      : 'TIME',
+        'TIMESTAMP' : 'TIMESTAMP'
     }
 
     def __init__(self, db, name):
+        self.name = name.strip()
         self.fields = []
         cursor = db.cursor()
         cursor.execute("""
@@ -131,13 +149,16 @@ class Table:
                 type_name = "%s(%d, %d)" % (type_name, precision, abs(scale))
 
             field = Field()
-            field.position = position
+            field.position = position+1 # firebird position is 1-based
             field.name = name.strip()
             field.type_ = type_name
             field.default_value = default
             field.nullable = null
 
             self.fields.append(field)
+
+    def __str__(self):
+        return "<firebird.Table: {0}>".format(self.name)
 
 def deleteForeignKeys():
     cursor.execute( "select r.rdb$relation_name, r.rdb$constraint_name "
