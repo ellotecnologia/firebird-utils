@@ -1,6 +1,7 @@
 import sys
 import fdb
 import firebird
+import optparse
 
 def store_func(filep):
     def store_statement(sql_stmt):
@@ -23,4 +24,9 @@ def main(database_path):
     f.close()
 
 if __name__=="__main__":
-    main(sys.argv[1])
+    parser = optparse.OptionParser(usage="%prog firebird_database_file")
+    (opts, args) = parser.parse_args()
+    if not args:
+        parser.print_help()
+        sys.exit(1)
+    main(args[0])
