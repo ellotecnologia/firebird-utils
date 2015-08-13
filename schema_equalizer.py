@@ -21,27 +21,13 @@ for table in src.tables:
     dst_table = dst.table(table.name)
     dst_table.equalize(table)
 
-# Recreate foreign keys
-for foreign_key in src.foreign_keys:
-    dst.create(foreign_key)
-
-# Recreate empty procedures
-for procedure in src.procedures:
-    dst.create_empty_procedure(procedure)
-
-# Recreate views
-for view in src.views:
-    dst.create(view)
-
-# Recreate full procedures
-for procedure in src.procedures:
-    dst.create_procedure(procedure)
-
-# Recreate Trigges
-for trigger in src.triggers:
-    dst.create(trigger)
-
-# Recreate indices
-
+dst.recreate_foreign_keys(src.foreign_keys)
+dst.recreate_empty_procedures(src.procedures)
+dst.recreate_views(src.views)
+dst.recreate_procedures(src.procedures)
+dst.recreate_triggers(src.triggers)
+dst.recreate_indices(src.indices)
 ## Apply grants
-#
+
+raw_input("Processo finalizado com sucesso!")
+

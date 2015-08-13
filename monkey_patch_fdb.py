@@ -1,4 +1,4 @@
-from fdb.schema import Table, Procedure
+from fdb.schema import Table, TableColumn, Procedure
 import logging
 
 # Monkey patch
@@ -16,19 +16,30 @@ def next(self):
     return self._patched_columns_iterator.next()
 
 def equalize(self, table):
-    for field in table:
-        if field not in self:
-            logging.info('Criando campo {}.{}'.format(table.name, field.name))
-            self.create_field(table.name, field)
+    for column in table:
+        if column not in self:
+            logging.info('Criando campo {}.{}'.format(table.name, column.name))
+            self.create_column(table.name, column)
 
-        #if field != self.get_column(field.name):
-        #    self.equalize_field(field)
+        #if column != self.get_column(column.name):
+        #    self.equalize_column(column)
+
+    for column in self:
+        if column not in table:
+            self.drop_column(column)
 
     logging.info(u"Reordenando campos de {}".format(table.name))
     self.reorder(table.columns)
 
-def create_field(self, table_name, field):
+def create_column(self, table_name, field):
     stmt = "ALTER TABLE {} ADD {} {}".format(table_name, field.name, field.datatype)
+    cursor = self.conn.cursor()
+    cursor.execute(stmt)
+    self.conn.commit()
+
+def drop_column(self, column):
+    logging.info(u"Removendo campo {}...".format(column.name))
+    stmt = column.get_sql_for('drop')
     cursor = self.conn.cursor()
     cursor.execute(stmt)
     self.conn.commit()
@@ -44,7 +55,8 @@ Table.__iter__ = __iter__
 Table.next = next
 Table.equalize = equalize
 Table.reorder = reorder
-Table.create_field = create_field
+Table.create_column = create_column
+Table.drop_column = drop_column
 
 def get_sql_empty_definition(self):
     in_params = ''
@@ -63,3 +75,13 @@ def get_sql_empty_definition(self):
 
 Procedure.get_sql_empty_definition = get_sql_empty_definition
 
+
+def column_equals(self, other):
+    return (
+        self.name==other.name
+        and self.datatype==other.datatype
+        and self.default==other.default
+        and self.isnullable()==other.isnullable()
+    )
+
+TableColumn.__eq__ = column_equals

@@ -5,7 +5,7 @@ import logging
 import monkey_patch_fdb
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(message)s',
     datefmt= '%H:%M:%S')
 
@@ -46,6 +46,39 @@ class Database(object):
             self.cursor.execute(instruction)
         self.db.commit()
 
+    def recreate_foreign_keys(self, foreign_keys):
+        logging.info(u"Recriando Foreign Keys...")
+        for foreign_key in foreign_keys:
+            self.create(foreign_key)
+
+    def recreate_empty_procedures(self, procedures):
+        """ Procedures precisam ser criadas vazias primeiro para o caso de haver
+            outras procedures/triggers/views que façam uso dela
+        """
+        logging.info(u"Recriando Procedures vazias...")
+        for procedure in procedures:
+            self.create_empty_procedure(procedure)
+
+    def recreate_views(self, views):
+        logging.info(u"Recriando Views...")
+        for view in views:
+            self.create(view)
+
+    def recreate_procedures(self, procedures):
+        logging.info(u"Recriando Procedures...")
+        for procedure in procedures:
+            self.create_procedure(procedure)
+
+    def recreate_triggers(self, triggers):
+        logging.info(u"Recriando Triggers...")
+        for trigger in triggers:
+            self.create(trigger)
+
+    def recreate_indices(self, indices):
+        logging.info(u"Recriando Índices...")
+        for index in indices:
+            self.create(index)
+
     def drop_indices(self):
         """ Drop all databse indexes
         """
@@ -74,7 +107,10 @@ class Database(object):
         for procedure in self.procedures:
             stmt = procedure.get_sql_for('drop')
             logging.debug(stmt)
-            self.cursor.execute(stmt)
+            try:
+                self.cursor.execute(stmt)
+            except fdb.fbcore.DatabaseError:
+                continue
         self.db.commit()
 
     def drop_functions(self):
@@ -123,7 +159,7 @@ class Database(object):
         return the_table
 
     def create(self, item):
-        logging.info(u"Criando {}...".format(item))
+        logging.debug(u"Criando {}...".format(item))
         stmt = item.get_sql_for('create')
         logging.debug(stmt)
         self.cursor.execute(stmt)
