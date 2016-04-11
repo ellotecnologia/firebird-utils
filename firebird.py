@@ -21,6 +21,11 @@ class Database(object):
         self.triggers = self.db.schema.triggers
 
     @property
+    def generators(self):
+        for generator in self.db.schema.generators:
+            yield generator
+
+    @property
     def foreign_keys(self):
         keys = {}
         for constraint in self.db.schema.constraints:
@@ -29,6 +34,16 @@ class Database(object):
 
         for k, constraint in keys.iteritems():
             yield constraint
+
+    @property
+    def primary_keys(self):
+        keys = {}
+        for primary_key in self.db.schema.constraints:
+            if primary_key.ispkey():
+                keys[primary_key.name] = primary_key
+
+        for k, primary_key in keys.iteritems():
+            yield primary_key
 
     @property
     def indices(self):
@@ -46,10 +61,33 @@ class Database(object):
             self.cursor.execute(instruction)
         self.db.commit()
 
+    def drop_primary_keys(self):
+        """ Drop all database primary keys
+        """
+        logging.info(u"Removendo Primary Keys...")
+        for key in self.primary_keys:
+            instruction = key.get_sql_for('drop')
+            logging.debug(instruction)
+            self.cursor.execute(instruction)
+        self.db.commit()
+
     def recreate_foreign_keys(self, foreign_keys):
         logging.info(u"Recriando Foreign Keys...")
         for foreign_key in foreign_keys:
             self.create(foreign_key)
+
+    def recreate_primary_keys(self, keys):
+        logging.info(u"Recriando Primary Keys...")
+        for key in keys:
+            # Pode ocorrer de a tabela já ter sido criada com a chave primária definida na DDL
+            # Nestes casos irá acontecer um erro na recriação desta chave. Sendo assim é preciso ignorar esse erro.
+            try:
+                self.create(key)
+            except fdb.fbcore.DatabaseError, e:
+                if 'already exists' in e.args[0]:
+                    logging.info(u'Erro ao tentar criar chave primária {0}. Chave já existe.'.format(key.name))
+                else:
+                    logging.info(u'Erro ao tentar criar chave primária {0}. ({1})'.format(key.name, e.args[0]))
 
     def recreate_empty_procedures(self, procedures):
         """ Procedures precisam ser criadas vazias primeiro para o caso de haver
@@ -58,6 +96,14 @@ class Database(object):
         logging.info(u"Recriando Procedures vazias...")
         for procedure in procedures:
             self.create_empty_procedure(procedure)
+
+    def recreate_functions(self, functions):
+        logging.info(u"Recriando Functions...")
+        for function in functions:
+            stmt = function.get_sql_for('declare')
+            logging.debug(stmt)
+            self.cursor.execute(stmt)
+            self.db.commit()
 
     def recreate_views(self, views):
         logging.info(u"Recriando Views...")
@@ -78,6 +124,16 @@ class Database(object):
         logging.info(u"Recriando Índices...")
         for index in indices:
             self.create(index)
+
+    def create_generators(self, generators):
+        logging.info(u"Recriando generators...")
+        ours_generators = [gen.name for gen in self.generators]
+        for gen in generators:
+            if gen.name not in ours_generators:
+                stmt = gen.get_sql_for('create')
+                logging.debug(stmt)
+                self.cursor.execute(stmt)
+        self.db.commit()
 
     def drop_indices(self):
         """ Drop all databse indexes
@@ -166,18 +222,35 @@ class Database(object):
         self.db.commit()
 
     def create_empty_procedure(self, procedure):
-        logging.info(u"Criando procedure {}...".format(procedure.name))
+        logging.debug(u"Criando procedure vazia {}...".format(procedure.name))
         stmt = procedure.get_sql_empty_definition()
         logging.debug(stmt)
         self.cursor.execute(stmt)
         self.db.commit()
 
     def create_procedure(self, procedure):
-        logging.info(u"Criando procedure {}...".format(procedure.name))
+        logging.debug(u"Criando procedure {}...".format(procedure.name))
         stmt = procedure.get_sql_for('create_or_alter')
         logging.debug(stmt)
         self.cursor.execute(stmt)
         self.db.commit()
+
+    def create_missing_tables(self, table_list):
+        logging.info(u"Verificando se faltam tabelas...")
+        for table in table_list:
+            if table not in self:
+                logging.info(u"Tabela {0} não existe no banco destino".format(table.name))
+                self.create(table)
+                continue
+
+            logging.info(u"Ajustando campos da tabela {0}".format(table.name))
+
+            dst_table = self.table(table.name)
+            dst_table.equalize(table)
+
+            # TODO: 
+            #   - Remover tabelas que estão sobrando
+            #   - Equalizar definição dos campos
 
     def __contains__(self, item):
         """ Recebe uma tabela e verifica se o banco de dados possui esta tabela
@@ -186,3 +259,4 @@ class Database(object):
             if table.name==item.name:
                 return True
         return False
+

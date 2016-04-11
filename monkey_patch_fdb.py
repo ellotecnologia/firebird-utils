@@ -28,7 +28,7 @@ def equalize(self, table):
         if column not in table:
             self.drop_column(column)
 
-    logging.info(u"Reordenando campos de {}".format(table.name))
+    logging.debug(u"Reordenando campos de {}".format(table.name))
     self.reorder(table.columns)
 
 def create_column(self, table_name, field):
@@ -40,6 +40,7 @@ def create_column(self, table_name, field):
 def drop_column(self, column):
     logging.info(u"Removendo campo {}...".format(column.name))
     stmt = column.get_sql_for('drop')
+    logging.debug(stmt)
     cursor = self.conn.cursor()
     cursor.execute(stmt)
     self.conn.commit()
