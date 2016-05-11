@@ -191,6 +191,7 @@ class Database(object):
             cursor.execute(sql)
             self.db.commit()
         except fdb.fbcore.DatabaseError, e:
+            logging.info("Erro ao remover {0} {1} ({2})".format(object_types[ttype], name, repr(e)))
             self.db.rollback()
             return False
         logging.debug("-> {0}".format(sql))
