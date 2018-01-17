@@ -1,4 +1,6 @@
 #coding: utf8
+from __future__ import unicode_literals
+
 import itertools
 import sys
 import fdb
@@ -8,7 +10,7 @@ import monkey_patch_fdb
 from fb_foreign_keys import cria_chave_estrangeira
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(message)s',
     datefmt= '%H:%M:%S')
 
@@ -60,10 +62,20 @@ class Database(object):
             if not index.isenforcer():
                 yield index
 
+    @property
+    def column_comments(self):
+        self.cursor.execute(
+            "SELECT a.RDB$RELATION_NAME, a.RDB$FIELD_NAME, a.RDB$DESCRIPTION "
+            "FROM RDB$RELATION_FIELDS a "
+            "WHERE a.RDB$DESCRIPTION IS NOT NULL"
+        )
+        rows = self.cursor.fetchall()
+        return rows
+
     def drop_foreign_keys(self):
         """ Drop all database foreign keys
         """
-        logging.info(u"Removendo Foreign Keys...")
+        logging.info("Removendo Foreign Keys...")
         for constraint in self.foreign_keys:
             instruction = constraint.get_sql_for('drop')
             logging.debug(instruction)
@@ -73,7 +85,7 @@ class Database(object):
     def drop_primary_keys(self):
         """ Drop all database primary keys
         """
-        logging.info(u"Removendo Primary Keys...")
+        logging.info("Removendo Primary Keys...")
         for key in self.primary_keys:
             instruction = key.get_sql_for('drop')
             logging.debug(instruction)
@@ -81,14 +93,14 @@ class Database(object):
         self.db.commit()
 
     def recreate_foreign_keys(self, foreign_keys):
-        logging.info(u"Recriando Foreign Keys...")
+        logging.info("Recriando Foreign Keys...")
         for foreign_key in foreign_keys:
             notify_progress()
             logging.debug("Recriando Foreign Key {0}".format(foreign_key.name))
             cria_chave_estrangeira(self.db, foreign_key.get_sql_for('create'))
 
     def recreate_primary_keys(self, keys):
-        logging.info(u"Recriando Primary Keys...")
+        logging.info("Recriando Primary Keys...")
         for key in keys:
             # Pode ocorrer de a tabela já ter sido criada com a chave primária definida na DDL
             # Nestes casos irá acontecer um erro na recriação desta chave. Sendo assim é preciso ignorar esse erro.
@@ -96,20 +108,20 @@ class Database(object):
                 self.create(key)
             except fdb.fbcore.DatabaseError, e:
                 if 'already exists' in e.args[0]:
-                    logging.info(u'Erro ao tentar criar chave primária {0}. Chave já existe.'.format(key.name))
+                    logging.info('Erro ao tentar criar chave primária {0}. Chave já existe.'.format(key.name))
                 else:
-                    logging.info(u'Erro ao tentar criar chave primária {0}. ({1})'.format(key.name, e.args[0]))
+                    logging.info('Erro ao tentar criar chave primária {0}. ({1})'.format(key.name, e.args[0]))
 
     def recreate_empty_procedures(self, procedures):
         """ Procedures precisam ser criadas vazias primeiro para o caso de haver
             outras procedures/triggers/views que façam uso dela
         """
-        logging.info(u"Recriando Procedures vazias...")
+        logging.info("Recriando Procedures vazias...")
         for procedure in procedures:
             self.create_empty_procedure(procedure)
 
     def recreate_functions(self, functions):
-        logging.info(u"Recriando Functions...")
+        logging.info("Recriando Functions...")
         for function in functions:
             notify_progress()
             stmt = function.get_sql_for('declare')
@@ -118,31 +130,31 @@ class Database(object):
             self.db.commit()
 
     def recreate_views(self, views):
-        logging.info(u"Recriando Views...")
+        logging.info("Recriando Views...")
         for view in views:
             notify_progress()
             self.create(view)
 
     def recreate_procedures(self, procedures):
-        logging.info(u"Recriando Procedures...")
+        logging.info("Recriando Procedures...")
         for procedure in procedures:
             notify_progress()
             self.create_procedure(procedure)
 
     def recreate_triggers(self, triggers):
-        logging.info(u"Recriando Triggers...")
+        logging.info("Recriando Triggers...")
         for trigger in triggers:
             notify_progress()
             self.create(trigger)
 
     def recreate_indices(self, indices):
-        logging.info(u"Recriando Índices...")
+        logging.info("Recriando Índices...")
         for index in indices:
             notify_progress()
             self.create(index)
 
     def create_generators(self, generators):
-        logging.info(u"Recriando generators...")
+        logging.info("Recriando generators...")
         ours_generators = [gen.name for gen in self.generators]
         for gen in generators:
             notify_progress()
@@ -155,7 +167,7 @@ class Database(object):
     def drop_indices(self):
         """ Drop all databse indexes
         """
-        logging.info(u"Removendo todos os índices...")
+        logging.info("Removendo todos os índices...")
         for index in self.indices:
             notify_progress()
             instruction = "DROP INDEX {}".format(index.name)
@@ -164,7 +176,7 @@ class Database(object):
         self.db.commit()
 
     def drop_triggers(self):
-        logging.info(u"Removendo todas as triggers...")
+        logging.info("Removendo todas as triggers...")
         for trigger in self.triggers:
             notify_progress()
             instruction = trigger.get_sql_for('drop')
@@ -173,13 +185,13 @@ class Database(object):
         self.db.commit()
 
     def drop_views(self):
-        logging.info(u"Removendo todas as views...")
+        logging.info("Removendo todas as views...")
         for view in self.views:
             notify_progress()
             self.drop_object_and_dependencies(view.name, 1)
 
     def drop_procedures(self):
-        logging.info(u"Removendo todas as procedures...")
+        logging.info("Removendo todas as procedures...")
         for procedure in self.procedures:
             notify_progress()
             stmt = procedure.get_sql_for('drop')
@@ -192,7 +204,7 @@ class Database(object):
         self.db.commit()
 
     def drop_functions(self):
-        logging.info(u"Removendo todas as functions...")
+        logging.info("Removendo todas as functions...")
         for function in self.functions:
             notify_progress()
             stmt = function.get_sql_for('drop')
@@ -240,36 +252,36 @@ class Database(object):
         return the_table
 
     def create(self, item):
-        logging.debug(u"Criando {}...".format(item))
+        logging.debug("Criando {}...".format(item))
         stmt = item.get_sql_for('create')
         logging.debug(stmt)
         self.cursor.execute(stmt)
         self.db.commit()
 
     def create_empty_procedure(self, procedure):
-        logging.debug(u"Criando procedure vazia {}...".format(procedure.name))
+        logging.debug("Criando procedure vazia {}...".format(procedure.name))
         stmt = procedure.get_sql_empty_definition()
         logging.debug(stmt)
         self.cursor.execute(stmt)
         self.db.commit()
 
     def create_procedure(self, procedure):
-        logging.debug(u"Criando procedure {}...".format(procedure.name))
+        logging.debug("Criando procedure {}...".format(procedure.name))
         stmt = procedure.get_sql_for('create_or_alter')
         logging.debug(stmt)
         self.cursor.execute(stmt)
         self.db.commit()
 
     def create_missing_tables(self, table_list):
-        logging.info(u"Sincronizando campos das tabelas, aguarde...")
+        logging.info("Sincronizando campos das tabelas, aguarde...")
         for table in table_list:
             notify_progress()
             if table not in self:
-                logging.info(u"Tabela {0} não existe no banco destino".format(table.name))
+                logging.info("Tabela {0} não existe no banco destino".format(table.name))
                 self.create(table)
                 continue
 
-            logging.debug(u"Ajustando campos da tabela {0}".format(table.name))
+            logging.debug("Ajustando campos da tabela {0}".format(table.name))
 
             dst_table = self.table(table.name)
             dst_table.equalize(table)
@@ -277,6 +289,19 @@ class Database(object):
             # TODO: 
             #   - Remover tabelas que estão sobrando
             #   - Equalizar definição dos campos
+
+    def remove_unused_tables(self, table_list):
+        pass
+
+    def synchronize_column_comments(self, column_comments):
+        logging.info("Sincronizando comentários dos campos")
+        for tablename, fieldname, comment in column_comments:
+            tablename = tablename.strip()
+            fieldname = fieldname.strip()
+            comment = comment.strip().decode('latin1', 'ignore')
+            logging.debug("Comentando campo {} da tabela {} = {}".format(fieldname, tablename, comment))
+            self.cursor.execute("COMMENT ON COLUMN {}.{} IS '{}'".format(tablename, fieldname, comment))
+        self.db.commit()
 
     def __contains__(self, item):
         """ Recebe uma tabela e verifica se o banco de dados possui esta tabela

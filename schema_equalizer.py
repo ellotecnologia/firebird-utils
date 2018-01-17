@@ -1,5 +1,6 @@
 # coding: utf8
-__VERSION__ = "0.5"
+
+__VERSION__ = "0.6"
 
 import sys
 from firebird import Database
@@ -19,19 +20,23 @@ dst.drop_views()
 dst.drop_procedures()
 dst.drop_functions()
 
-print
-
 dst.create_missing_tables(src.tables)
+dst.remove_unused_tables(src.tables)
 
 dst.create_generators(src.generators)
+
 dst.recreate_primary_keys(src.primary_keys)
 dst.recreate_foreign_keys(src.foreign_keys)
+
 dst.recreate_empty_procedures(src.procedures)
 dst.recreate_functions(src.functions)
 dst.recreate_views(src.views)
 dst.recreate_procedures(src.procedures)
 dst.recreate_triggers(src.triggers)
 dst.recreate_indices(src.indices)
+
+dst.synchronize_column_comments(src.column_comments)
+
 ## Apply grants
 
 raw_input("Processo finalizado com sucesso!")
