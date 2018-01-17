@@ -1,8 +1,15 @@
 # coding: utf8
+__VERSION__ = "0.5"
+
+import sys
 from firebird import Database
 
-src = Database(raw_input('Informe o caminho do banco de dados BOM: '))
-dst = Database(raw_input('Informe o caminho do banco de dados ZUADO: '))
+if len(sys.argv) > 2:
+    src = Database(sys.argv[1])
+    dst = Database(sys.argv[2])
+else:
+    src = Database(raw_input('Informe o caminho do banco de dados BOM: '))
+    dst = Database(raw_input('Informe o caminho do banco de dados ZUADO: '))
 
 dst.drop_foreign_keys()
 dst.drop_indices()
