@@ -1,13 +1,22 @@
 #coding: utf8
+import itertools
+import sys
 import fdb
 import fdb.fbcore
 import logging
 import monkey_patch_fdb
+from fb_foreign_keys import cria_chave_estrangeira
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s',
     datefmt= '%H:%M:%S')
+
+spinner = itertools.cycle(['-', '/', '|', '\\'])
+def notify_progress():
+    sys.stdout.write(spinner.next())
+    sys.stdout.flush()
+    sys.stdout.write('\b')
 
 class Database(object):
 
@@ -74,7 +83,9 @@ class Database(object):
     def recreate_foreign_keys(self, foreign_keys):
         logging.info(u"Recriando Foreign Keys...")
         for foreign_key in foreign_keys:
-            self.create(foreign_key)
+            notify_progress()
+            logging.debug("Recriando Foreign Key {0}".format(foreign_key.name))
+            cria_chave_estrangeira(self.db, foreign_key.get_sql_for('create'))
 
     def recreate_primary_keys(self, keys):
         logging.info(u"Recriando Primary Keys...")
@@ -100,6 +111,7 @@ class Database(object):
     def recreate_functions(self, functions):
         logging.info(u"Recriando Functions...")
         for function in functions:
+            notify_progress()
             stmt = function.get_sql_for('declare')
             logging.debug(stmt)
             self.cursor.execute(stmt)
@@ -108,27 +120,32 @@ class Database(object):
     def recreate_views(self, views):
         logging.info(u"Recriando Views...")
         for view in views:
+            notify_progress()
             self.create(view)
 
     def recreate_procedures(self, procedures):
         logging.info(u"Recriando Procedures...")
         for procedure in procedures:
+            notify_progress()
             self.create_procedure(procedure)
 
     def recreate_triggers(self, triggers):
         logging.info(u"Recriando Triggers...")
         for trigger in triggers:
+            notify_progress()
             self.create(trigger)
 
     def recreate_indices(self, indices):
         logging.info(u"Recriando Índices...")
         for index in indices:
+            notify_progress()
             self.create(index)
 
     def create_generators(self, generators):
         logging.info(u"Recriando generators...")
         ours_generators = [gen.name for gen in self.generators]
         for gen in generators:
+            notify_progress()
             if gen.name not in ours_generators:
                 stmt = gen.get_sql_for('create')
                 logging.debug(stmt)
@@ -140,6 +157,7 @@ class Database(object):
         """
         logging.info(u"Removendo todos os índices...")
         for index in self.indices:
+            notify_progress()
             instruction = "DROP INDEX {}".format(index.name)
             logging.debug(instruction)
             self.cursor.execute(instruction)
@@ -148,6 +166,7 @@ class Database(object):
     def drop_triggers(self):
         logging.info(u"Removendo todas as triggers...")
         for trigger in self.triggers:
+            notify_progress()
             instruction = trigger.get_sql_for('drop')
             logging.debug(instruction)
             self.cursor.execute(instruction)
@@ -156,22 +175,26 @@ class Database(object):
     def drop_views(self):
         logging.info(u"Removendo todas as views...")
         for view in self.views:
+            notify_progress()
             self.drop_object_and_dependencies(view.name, 1)
 
     def drop_procedures(self):
         logging.info(u"Removendo todas as procedures...")
         for procedure in self.procedures:
+            notify_progress()
             stmt = procedure.get_sql_for('drop')
             logging.debug(stmt)
             try:
                 self.cursor.execute(stmt)
-            except fdb.fbcore.DatabaseError:
+            except fdb.fbcore.DatabaseError as e:
+                logging.error(e.message)
                 continue
         self.db.commit()
 
     def drop_functions(self):
         logging.info(u"Removendo todas as functions...")
         for function in self.functions:
+            notify_progress()
             stmt = function.get_sql_for('drop')
             logging.debug(stmt)
             self.cursor.execute(stmt)
@@ -182,6 +205,7 @@ class Database(object):
         object_name = name.strip()
         object_types = { 1 : 'VIEW', 2 : 'TRIGGER', 5 : 'PROCEDURE', 99: 'EXTERNAL FUNCTION' }
         for dname, dtype in self._get_dependencies(object_name):
+            notify_progress()
             dname = dname.strip()
             if dname==object_name: continue
             self.drop_object_and_dependencies(dname, dtype)
@@ -237,14 +261,15 @@ class Database(object):
         self.db.commit()
 
     def create_missing_tables(self, table_list):
-        logging.info(u"Verificando se faltam tabelas...")
+        logging.info(u"Sincronizando campos das tabelas, aguarde...")
         for table in table_list:
+            notify_progress()
             if table not in self:
                 logging.info(u"Tabela {0} não existe no banco destino".format(table.name))
                 self.create(table)
                 continue
 
-            logging.info(u"Ajustando campos da tabela {0}".format(table.name))
+            logging.debug(u"Ajustando campos da tabela {0}".format(table.name))
 
             dst_table = self.table(table.name)
             dst_table.equalize(table)
