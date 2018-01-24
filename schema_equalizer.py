@@ -1,9 +1,11 @@
 # coding: utf8
-
-__VERSION__ = "0.6"
+from __future__ import unicode_literals
 
 import sys
+
 from firebird import Database
+
+__VERSION__ = "0.7"
 
 if len(sys.argv) > 2:
     src = Database(sys.argv[1])
@@ -21,7 +23,7 @@ dst.drop_procedures()
 dst.drop_functions()
 
 dst.create_missing_tables(src.tables)
-dst.remove_unused_tables(src.tables)
+dst.remove_unused_tables(src)
 
 dst.create_generators(src.generators)
 
@@ -35,9 +37,9 @@ dst.recreate_procedures(src.procedures)
 dst.recreate_triggers(src.triggers)
 dst.recreate_indices(src.indices)
 
-dst.synchronize_column_comments(src.column_comments)
+dst.synchronize_comments(src)
 
-## Apply grants
+# TODO: Apply grants
 
 raw_input("Processo finalizado com sucesso!")
 

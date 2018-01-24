@@ -72,6 +72,16 @@ class Database(object):
         rows = self.cursor.fetchall()
         return rows
 
+    @property
+    def table_comments(self):
+        self.cursor.execute(
+            "SELECT RDB$RELATION_NAME, RDB$DESCRIPTION "
+            "FROM RDB$RELATIONS "
+            "WHERE RDB$DESCRIPTION IS NOT NULL",
+        )
+        rows = self.cursor.fetchall()
+        return rows
+
     def drop_foreign_keys(self):
         """ Drop all database foreign keys
         """
@@ -277,23 +287,28 @@ class Database(object):
         for table in table_list:
             notify_progress()
             if table not in self:
-                logging.info("Tabela {0} não existe no banco destino".format(table.name))
+                logging.debug("Tabela {0} não existe no banco destino".format(table.name))
                 self.create(table)
                 continue
 
             logging.debug("Ajustando campos da tabela {0}".format(table.name))
-
             dst_table = self.table(table.name)
             dst_table.equalize(table)
+        self.db.commit()
 
-            # TODO: 
-            #   - Remover tabelas que estão sobrando
-            #   - Equalizar definição dos campos
+    def remove_unused_tables(self, source_database):
+        for table in self.tables:
+            notify_progress()
+            if table not in source_database:
+                logging.debug("Removendo tabela {}".format(table.name))
+                self.cursor.execute("DROP TABLE {}".format(table.name))
+        self.db.commit()
 
-    def remove_unused_tables(self, table_list):
-        pass
+    def synchronize_comments(self, src):
+        self._synchronize_column_comments(src.column_comments)
+        self._synchronize_table_comments(src.table_comments)
 
-    def synchronize_column_comments(self, column_comments):
+    def _synchronize_column_comments(self, column_comments):
         logging.info("Sincronizando comentários dos campos")
         for tablename, fieldname, comment in column_comments:
             tablename = tablename.strip()
@@ -303,11 +318,21 @@ class Database(object):
             self.cursor.execute("COMMENT ON COLUMN {}.{} IS '{}'".format(tablename, fieldname, comment))
         self.db.commit()
 
+    def _synchronize_table_comments(self, table_comments):
+        logging.info("Sincronizando comentários das tabelas")
+        for tablename, comment in table_comments:
+            tablename = tablename.strip()
+            comment = comment.strip().decode('latin1', 'ignore')
+            logging.debug("Comentando tabela {} = {}".format(tablename, comment))
+            self.cursor.execute("COMMENT ON TABLE {} IS '{}'".format(tablename, comment))
+        self.db.commit()
+
     def __contains__(self, item):
         """ Recebe uma tabela e verifica se o banco de dados possui esta tabela
         """
         for table in self.tables:
-            if table.name==item.name:
+            if table.name.strip()==item.name.strip():
                 return True
         return False
 
+# TODO: Equalizar definição dos campos
