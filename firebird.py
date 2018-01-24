@@ -12,16 +12,18 @@ from fb_foreign_keys import cria_chave_estrangeira
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(message)s',
-    datefmt= '%H:%M:%S')
+    datefmt='%H:%M:%S')
 
 spinner = itertools.cycle(['-', '/', '|', '\\'])
+
+
 def notify_progress():
     sys.stdout.write(spinner.next())
     sys.stdout.flush()
     sys.stdout.write('\b')
 
-class Database(object):
 
+class Database(object):
     def __init__(self, database_path, username='sysdba', password='masterkey'):
         self.db = fdb.connect(database_path, username, password)
         self.cursor = self.db.cursor()
@@ -67,18 +69,15 @@ class Database(object):
         self.cursor.execute(
             "SELECT a.RDB$RELATION_NAME, a.RDB$FIELD_NAME, a.RDB$DESCRIPTION "
             "FROM RDB$RELATION_FIELDS a "
-            "WHERE a.RDB$DESCRIPTION IS NOT NULL"
-        )
+            "WHERE a.RDB$DESCRIPTION IS NOT NULL")
         rows = self.cursor.fetchall()
         return rows
 
     @property
     def table_comments(self):
-        self.cursor.execute(
-            "SELECT RDB$RELATION_NAME, RDB$DESCRIPTION "
-            "FROM RDB$RELATIONS "
-            "WHERE RDB$DESCRIPTION IS NOT NULL",
-        )
+        self.cursor.execute("SELECT RDB$RELATION_NAME, RDB$DESCRIPTION "
+                            "FROM RDB$RELATIONS "
+                            "WHERE RDB$DESCRIPTION IS NOT NULL", )
         rows = self.cursor.fetchall()
         return rows
 
@@ -118,9 +117,13 @@ class Database(object):
                 self.create(key)
             except fdb.fbcore.DatabaseError, e:
                 if 'already exists' in e.args[0]:
-                    logging.info('Erro ao tentar criar chave primária {0}. Chave já existe.'.format(key.name))
+                    logging.info(
+                        'Erro ao tentar criar chave primária {0}. Chave já existe.'.
+                        format(key.name))
                 else:
-                    logging.info('Erro ao tentar criar chave primária {0}. ({1})'.format(key.name, e.args[0]))
+                    logging.info(
+                        'Erro ao tentar criar chave primária {0}. ({1})'.
+                        format(key.name, e.args[0]))
 
     def recreate_empty_procedures(self, procedures):
         """ Procedures precisam ser criadas vazias primeiro para o caso de haver
@@ -225,11 +228,16 @@ class Database(object):
     def drop_object_and_dependencies(self, name, ttype):
         cursor = self.db.cursor()
         object_name = name.strip()
-        object_types = { 1 : 'VIEW', 2 : 'TRIGGER', 5 : 'PROCEDURE', 99: 'EXTERNAL FUNCTION' }
+        object_types = {
+            1: 'VIEW',
+            2: 'TRIGGER',
+            5: 'PROCEDURE',
+            99: 'EXTERNAL FUNCTION'
+        }
         for dname, dtype in self._get_dependencies(object_name):
             notify_progress()
             dname = dname.strip()
-            if dname==object_name: continue
+            if dname == object_name: continue
             self.drop_object_and_dependencies(dname, dtype)
 
         sql = 'DROP {0} {1}'.format(object_types[ttype], object_name)
@@ -237,7 +245,8 @@ class Database(object):
             cursor.execute(sql)
             self.db.commit()
         except fdb.fbcore.DatabaseError, e:
-            logging.info("Erro ao remover {0} {1} ({2})".format(object_types[ttype], name, repr(e)))
+            logging.info("Erro ao remover {0} {1} ({2})".format(
+                object_types[ttype], name, repr(e)))
             self.db.rollback()
             return False
         logging.debug("-> {0}".format(sql))
@@ -246,11 +255,12 @@ class Database(object):
     def _get_dependencies(self, object_name):
         """ Retorna a lista de dependencias de um objeto
         """
-        sql = ("select a.RDB$DEPENDENT_NAME, a.RDB$DEPENDENT_TYPE "
-               "FROM RDB$DEPENDENCIES a                           "
-               "WHERE                                             "
-               "    a.RDB$DEPENDED_ON_TYPE IN (1,2,5)             "
-               "    AND a.RDB$DEPENDED_ON_NAME='%s'               " % object_name)
+        sql = (
+            "select a.RDB$DEPENDENT_NAME, a.RDB$DEPENDENT_TYPE "
+            "FROM RDB$DEPENDENCIES a                           "
+            "WHERE                                             "
+            "    a.RDB$DEPENDED_ON_TYPE IN (1,2,5)             "
+            "    AND a.RDB$DEPENDED_ON_NAME='%s'               " % object_name)
         cursor = self.db.cursor()
         cursor.execute(sql)
         dependencies = cursor.fetchall()
@@ -287,7 +297,8 @@ class Database(object):
         for table in table_list:
             notify_progress()
             if table not in self:
-                logging.debug("Tabela {0} não existe no banco destino".format(table.name))
+                logging.debug("Tabela {0} não existe no banco destino".format(
+                    table.name))
                 self.create(table)
                 continue
 
@@ -314,8 +325,10 @@ class Database(object):
             tablename = tablename.strip()
             fieldname = fieldname.strip()
             comment = comment.strip().decode('latin1', 'ignore')
-            logging.debug("Comentando campo {} da tabela {} = {}".format(fieldname, tablename, comment))
-            self.cursor.execute("COMMENT ON COLUMN {}.{} IS '{}'".format(tablename, fieldname, comment))
+            logging.debug("Comentando campo {} da tabela {} = {}".format(
+                fieldname, tablename, comment))
+            self.cursor.execute("COMMENT ON COLUMN {}.{} IS '{}'".format(
+                tablename, fieldname, comment))
         self.db.commit()
 
     def _synchronize_table_comments(self, table_comments):
@@ -323,16 +336,19 @@ class Database(object):
         for tablename, comment in table_comments:
             tablename = tablename.strip()
             comment = comment.strip().decode('latin1', 'ignore')
-            logging.debug("Comentando tabela {} = {}".format(tablename, comment))
-            self.cursor.execute("COMMENT ON TABLE {} IS '{}'".format(tablename, comment))
+            logging.debug("Comentando tabela {} = {}".format(
+                tablename, comment))
+            self.cursor.execute("COMMENT ON TABLE {} IS '{}'".format(
+                tablename, comment))
         self.db.commit()
 
     def __contains__(self, item):
         """ Recebe uma tabela e verifica se o banco de dados possui esta tabela
         """
         for table in self.tables:
-            if table.name.strip()==item.name.strip():
+            if table.name.strip() == item.name.strip():
                 return True
         return False
+
 
 # TODO: Equalizar definição dos campos
