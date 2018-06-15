@@ -1,4 +1,7 @@
-#coding: utf8
+# encoding: utf8
+from __future__ import unicode_literals
+from __future__ import print_function
+
 import re
 import logging
 from fdb.fbcore import DatabaseError
@@ -16,9 +19,12 @@ def cria_chave_estrangeira(conn, ddl):
         except DatabaseError, e:
             conn.rollback()
             logging.error(e[0])
-            print("Instrução que causou o problema:")
+            print("")
+            print("Instrução que causou o problema:\n")
             print(ddl)
-            print("Aguardando correção.")
+            print("")
+            print("Faça a correção manual no banco de dados.")
+            print("Após isso, pressione ENTER para tentar novamente")
             raw_input()
             #nome_tabela = extrai_nome_tabela(e[0])
             #clausula_where = extrai_clausula_where(e[0])
