@@ -1,45 +1,100 @@
 # coding: utf8
 from __future__ import unicode_literals
+from __future__ import print_function
 
 import sys
+import argparse
+import logging
 
-from firebird import Database
+import config
+import firebird
 
-__VERSION__ = "0.7"
 
-if len(sys.argv) > 2:
-    src = Database(sys.argv[1])
-    dst = Database(sys.argv[2])
-else:
-    src = Database(raw_input('Informe o caminho do banco de dados BOM: '))
-    dst = Database(raw_input('Informe o caminho do banco de dados ZUADO: '))
+__VERSION__ = "1.0"
 
-dst.drop_foreign_keys()
-dst.drop_indices()
-dst.drop_primary_keys()
-dst.drop_triggers()
-dst.drop_views()
-dst.drop_procedures()
-dst.drop_functions()
 
-dst.create_missing_tables(src.tables)
-dst.remove_unused_tables(src)
+def main(src_database_file, dst_database_file):
+    """ Sincroniza a estrutura do banco 'src_database_file' de acordo com
+        a estrutura de 'dst_database_file'.
+    """
+    src_connection = firebird.create_connection(src_database_file)
+    dst_connection = firebird.create_connection(dst_database_file)
+    
+    src = firebird.Database(src_connection)
+    dst = firebird.Database(dst_connection)
 
-dst.create_generators(src.generators)
+    dst.drop_foreign_keys()
+    dst.drop_indices()
+    dst.drop_primary_keys()
+    dst.drop_triggers()
+    dst.drop_views()
+    dst.drop_procedures()
+    dst.drop_functions()
 
-dst.recreate_primary_keys(src.primary_keys)
-dst.recreate_foreign_keys(src.foreign_keys)
+    dst.create_missing_tables(src.tables)
+    dst.remove_unused_tables(src)
 
-dst.recreate_empty_procedures(src.procedures)
-dst.recreate_functions(src.functions)
-dst.recreate_views(src.views)
-dst.recreate_procedures(src.procedures)
-dst.recreate_triggers(src.triggers)
-dst.recreate_indices(src.indices)
+    dst.create_generators(src.generators)
 
-dst.synchronize_comments(src)
+    dst.recreate_primary_keys(src.primary_keys)
+    dst.recreate_foreign_keys(src.foreign_keys)
 
-# TODO: Apply grants
+    dst.recreate_empty_procedures(src.procedures)
+    dst.recreate_functions(src.functions)
+    dst.recreate_views(src.views)
+    dst.recreate_procedures(src.procedures)
+    dst.recreate_triggers(src.triggers)
+    dst.recreate_indices(src.indices)
 
-raw_input("Processo finalizado com sucesso!")
+    dst.synchronize_comments(src)
+    # TODO: Apply grants
+    
+    sincroniza_sequencial_release(src_connection, dst_connection)
 
+    logging.info("")
+    logging.info("Processo finalizado com sucesso!")
+
+
+def sincroniza_sequencial_release(src_connection, dst_connection):
+    """ Sincroniza o valor do parâmetro GerIdScriptRelease nos bancos
+    """
+    src_cursor = src_connection.cursor()
+    dst_cursor = dst_connection.cursor()
+    src_cursor.execute("SELECT CAST(Valor AS VARCHAR(5)) "
+                       "FROM TGerParametros "
+                       "WHERE parametro='GERIDSCRIPTRELEASE'")
+    ultimo_id = src_cursor.fetchone()[0]
+    logging.info("Atualizando sequencial de Release para {}".format(ultimo_id))
+    dst_cursor.execute("UPDATE TGerParametros "
+                       "SET Valor='{}' "
+                       "WHERE parametro='GERIDSCRIPTRELEASE'".format(ultimo_id))
+    dst_connection.commit()
+    
+    
+def parse_args():
+    parser = argparse.ArgumentParser(description="Utilitário de Equalização de Banco de Dados Firebird")
+    parser.add_argument('--debug', action="store_true", default=False, help="Ativa modo debug")
+    parser.add_argument('--version', action="store_true", dest="version", help="Mostra versão do utilitário")
+    parser.add_argument('ORIGEM', nargs='?')
+    parser.add_argument('DESTINO', nargs='?')
+    return parser.parse_args()
+
+    
+if __name__ == "__main__":
+    args = parse_args()
+
+    if args.version:
+        print("Schema Equalizer versão {}".format(__VERSION__))
+        sys.exit()
+
+    config.setup_config(args.debug)
+    
+    if args.ORIGEM and args.DESTINO:
+        src_database_path = args.ORIGEM
+        dst_database_path = args.DESTINO
+    else:
+        src_database_path = raw_input('Informe o caminho do banco de dados BOM: ')
+        dst_database_path = raw_input('Informe o caminho do banco de dados ZUADO: ')
+    
+    main(src_database_path, dst_database_path)
+    raw_input('')    
