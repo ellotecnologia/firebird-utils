@@ -4,16 +4,10 @@ import fdb
 con = fdb.connect(dsn=sys.argv[1])
 cur = con.cursor()
 
-cur.execute("""\
-select rdb$relation_name
-from rdb$relations
-where rdb$view_blr is null 
-and (rdb$system_flag is null or rdb$system_flag = 0)
-""")
-
 tabelas = {}
 
-for tablename, in cur.fetchall(): 
+for table in con.schema.tables: 
+    tablename = table.name
     cur.execute('select count(*) from %s' % tablename)
 
     try:
