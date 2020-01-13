@@ -3,6 +3,8 @@ import py2exe
 
 import sys; sys.argv.append('py2exe')
 
+from schema_equalizer import __VERSION__
+
 py2exe_options = dict(
                       excludes=['_ssl',  # Exclude _ssl
                                 'pyreadline', 'difflib', 'doctest', 
@@ -13,7 +15,7 @@ py2exe_options = dict(
                       )
 
 setup(name='Schema Equalizer',
-      version='1.0',
+      version=__VERSION__,
       description='<Description>',
       author='Clayton A. Alves',
       options={'py2exe': py2exe_options},
