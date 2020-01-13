@@ -299,7 +299,7 @@ class Database(object):
         self.db.commit()
 
     def create_missing_tables(self, table_list):
-        logging.info("Sincronizando tabelas, aguarde...")
+        #logging.info("Sincronizando tabelas, aguarde...")
         for table in table_list:
             notify_progress()
             if table not in self:
@@ -416,7 +416,10 @@ class Database(object):
             comment = comment.strip().decode('latin1', 'ignore')
             #logging.info("Adicionando comentário no campo {} da tabela {}".format(fieldname, tablename))
             notify_progress()
-            self.cursor.execute("COMMENT ON COLUMN {}.{} IS '{}'".format(tablename, fieldname, comment))
+            try:
+                self.cursor.execute("COMMENT ON COLUMN {}.{} IS '{}'".format(tablename, fieldname, comment))
+            except fdb.fbcore.DatabaseError as e:
+                logging.info('{} {} {}'.format(tablename, fieldname, comment))
         self.db.commit()
 
     def _synchronize_table_comments(self, table_comments):
