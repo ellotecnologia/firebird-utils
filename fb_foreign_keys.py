@@ -30,6 +30,7 @@ def cria_chave_estrangeira(conn, ddl):
             #clausula_where = extrai_clausula_where(e[0])
             #remove_registro(conn, nome_tabela, clausula_where)
 
+
 def extrai_nome_tabela(error_msg):
    match = re.search('on table "(\w+)"', error_msg)
    if match:
@@ -37,9 +38,11 @@ def extrai_nome_tabela(error_msg):
    else:
       return ""
    
+
 def extrai_clausula_where(error_msg):
     match = re.search('key value is \((.+)\)', error_msg)
     return match.groups()[0].replace('"', '').replace(',', ' and')
+
 
 def remove_registro(conn, nome_tabela, clausula_where):
     cursor = conn.cursor()
@@ -55,6 +58,7 @@ def remove_registro(conn, nome_tabela, clausula_where):
             nome_tabela2 = extrai_nome_tabela(e[0])
             clausula_where2 = extrai_clausula_where(e[0])
             remove_registro(conn, nome_tabela2, clausula_where2)
+
 
 if __name__=="__main__":
     import fdb
