@@ -367,7 +367,7 @@ class Database(object):
     def create_field(self, table, field, field_name=None):
         """ Cria um novo campo"""
         field_name = field_name or field.name
-        logging.info('Criando campo {}.{}'.format(table.name, field_name))
+        logging.debug('Criando campo {}.{}'.format(table.name, field_name))
         stmt = "ALTER TABLE {} ADD {} {} ".format(table.name, field_name, field.datatype)
         if field.has_default():
             stmt += "DEFAULT {}".format(field.default)
@@ -381,7 +381,7 @@ class Database(object):
         """ Remove campos que estiverem sobrando na tabela 'table' """
         for field in table:
             if field not in reference_table:
-                logging.info("Removendo campo {}.{} pois não mais utilizado".format(table.name, field.name))
+                logging.info("Removendo campo {}.{} pois não é mais utilizado".format(table.name, field.name))
                 stmt = field.get_sql_for('drop')
                 logging.debug(stmt)
                 self.cursor.execute(stmt)
