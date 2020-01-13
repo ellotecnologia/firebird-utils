@@ -308,7 +308,22 @@ class Database(object):
                 continue
         self.db.commit()
         self.schema.reload()
+        # This routine creates tables with their respective primary/foreign keys,
+        # so we need to remove them to avoid errors at the end of the process,
+        # when ALL constraints are recreated.
+        self.drop_foreign_keys()
+        self.drop_indices()
+        self.drop_primary_keys()
 
+    def remove_dangling_tables(self, source_database):
+        for table in self.tables:
+            notify_progress()
+            if table not in source_database:
+                logging.info("Removendo tabela {}".format(table.name))
+                self.cursor.execute("DROP TABLE {}".format(table.name))
+        self.db.commit()
+        self.schema.reload()
+        
     def sync_tables_structure(self, reference_tables):
         logging.info("Sincronizando campos das tabelas, aguarde...")
         for reference_table in reference_tables:
@@ -396,14 +411,6 @@ class Database(object):
             self.cursor.execute(stmt)
         self.db.commit()
     
-    def remove_dangling_tables(self, source_database):
-        for table in self.tables:
-            notify_progress()
-            if table not in source_database:
-                logging.info("Removendo tabela {}".format(table.name))
-                self.cursor.execute("DROP TABLE {}".format(table.name))
-        self.db.commit()
-
     def synchronize_comments(self, src):
         self._synchronize_column_comments(src.column_comments)
         self._synchronize_table_comments(src.table_comments)
