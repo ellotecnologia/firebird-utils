@@ -87,8 +87,7 @@ class Database(object):
         logging.info("Removendo Chaves Estrangeiras")
         for constraint in self.foreign_keys:
             instruction = constraint.get_sql_for('drop')
-            logging.debug(instruction)
-            self.cursor.execute(instruction)
+            self.execute(instruction)
         self.db.commit()
 
     def drop_primary_keys(self):
@@ -97,8 +96,7 @@ class Database(object):
         logging.info("Removendo Chaves Primárias")
         for key in self.primary_keys:
             instruction = key.get_sql_for('drop')
-            logging.debug(instruction)
-            self.cursor.execute(instruction)
+            self.execute(instruction)
         self.db.commit()
 
     def recreate_foreign_keys(self, foreign_keys):
@@ -142,8 +140,7 @@ class Database(object):
         for function in functions:
             notify_progress()
             stmt = function.get_sql_for('declare')
-            logging.debug(stmt)
-            self.cursor.execute(stmt)
+            self.execute(stmt)
             self.db.commit()
 
     def recreate_views(self, views):
@@ -177,8 +174,7 @@ class Database(object):
             notify_progress()
             if gen.name not in ours_generators:
                 stmt = gen.get_sql_for('create')
-                logging.debug(stmt)
-                self.cursor.execute(stmt)
+                self.execute(stmt)
         self.db.commit()
 
     def drop_indices(self):
@@ -188,8 +184,7 @@ class Database(object):
         for index in self.indices:
             notify_progress()
             instruction = "DROP INDEX {}".format(index.name)
-            logging.debug(instruction)
-            self.cursor.execute(instruction)
+            self.execute(instruction)
         self.db.commit()
 
     def drop_triggers(self):
@@ -197,8 +192,7 @@ class Database(object):
         for trigger in self.triggers:
             notify_progress()
             instruction = trigger.get_sql_for('drop')
-            logging.debug(instruction)
-            self.cursor.execute(instruction)
+            self.execute(instruction)
         self.db.commit()
 
     def drop_views(self):
@@ -213,7 +207,7 @@ class Database(object):
             notify_progress()
             stmt = procedure.get_sql_for('drop')
             try:
-                self.cursor.execute(stmt)
+                self.execute(stmt)
             except fdb.fbcore.DatabaseError as e:
                 if (e.args[1] == -607) and (e.args[2] == 335544351):
                     logging.error("  procedure {} já foi removida.".format(procedure.name))
@@ -227,8 +221,7 @@ class Database(object):
         for function in self.functions:
             notify_progress()
             stmt = function.get_sql_for('drop')
-            logging.debug(stmt)
-            self.cursor.execute(stmt)
+            self.execute(stmt)
         self.db.commit()
 
     def drop_object_and_dependencies(self, name, ttype):
@@ -278,24 +271,20 @@ class Database(object):
         return table
 
     def create(self, item):
-        #logging.debug("Criando {}".format(item))
         stmt = item.get_sql_for('create')
-        logging.debug(stmt)
-        self.cursor.execute(stmt)
+        self.execute(stmt)
         self.db.commit()
 
     def create_empty_procedure(self, procedure):
         logging.debug("Criando esqueleto da procedure {}".format(procedure.name))
         stmt = procedure.get_sql_empty_definition()
-        logging.debug(stmt)
-        self.cursor.execute(stmt)
+        self.execute(stmt)
         self.db.commit()
 
     def create_procedure(self, procedure):
         logging.debug("Criando procedure {}".format(procedure.name))
         stmt = procedure.get_sql_for('create_or_alter')
-        logging.debug(stmt)
-        self.cursor.execute(stmt)
+        self.execute(stmt)
         self.db.commit()
 
     def create_missing_tables(self, table_list):
@@ -320,7 +309,7 @@ class Database(object):
             notify_progress()
             if table not in source_database:
                 logging.info("Removendo tabela {}".format(table.name))
-                self.cursor.execute("DROP TABLE {}".format(table.name))
+                self.execute("DROP TABLE {}".format(table.name))
         self.db.commit()
         self.schema.reload()
         
@@ -328,7 +317,6 @@ class Database(object):
         logging.info("Sincronizando campos das tabelas, aguarde...")
         for reference_table in reference_tables:
             notify_progress()
-            #logging.debug("Ajustando campos da tabela {0}".format(reference_table.name))
             table = self.get_table(reference_table.name)
             if self.sync_fielddefs:
                 self.sync_table_fields(table, reference_table)
@@ -338,7 +326,6 @@ class Database(object):
     
     def sync_table_fields(self, table, reference_table):
         for reference_field in reference_table:
-            #import pdb; pdb.set_trace()
             if reference_field not in table:
                 self.create_field(table, reference_field)
             else:
@@ -388,9 +375,8 @@ class Database(object):
             stmt += "DEFAULT {}".format(field.default)
         if not field.isnullable():
             stmt += "NOT NULL "
-        cursor = table.conn.cursor()
-        cursor.execute(stmt)
-        table.conn.commit()
+        self.execute(stmt)
+        self.db.commit()
 
     def drop_dangling_fields(self, table, reference_table):
         """ Remove campos que estiverem sobrando na tabela 'table' """
@@ -398,8 +384,7 @@ class Database(object):
             if field not in reference_table:
                 logging.info("Removendo campo {}.{} pois não é mais utilizado".format(table.name, field.name))
                 stmt = field.get_sql_for('drop')
-                logging.debug(stmt)
-                self.cursor.execute(stmt)
+                self.execute(stmt)
         self.db.commit()
     
     def reorder_table_fields(self, table, reference_columns):
@@ -407,8 +392,7 @@ class Database(object):
         logging.debug("Reordenando campos de {}".format(table.name))
         for column in reference_columns:
             stmt = column.get_sql_for('alter', position=column.position+1)
-            logging.debug(stmt)
-            self.cursor.execute(stmt)
+            self.execute(stmt)
         self.db.commit()
     
     def synchronize_comments(self, src):
