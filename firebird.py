@@ -1,6 +1,3 @@
-# encoding: utf8
-from __future__ import unicode_literals
-
 import fdb
 import fdb.fbcore
 import logging
@@ -45,7 +42,7 @@ class Database(object):
             if constraint.isfkey():
                 keys[constraint.name] = constraint
 
-        for k, constraint in keys.iteritems():
+        for k, constraint in keys.items():
             yield constraint
 
     @property
@@ -55,7 +52,7 @@ class Database(object):
             if primary_key.ispkey():
                 keys[primary_key.name] = primary_key
 
-        for k, primary_key in keys.iteritems():
+        for k, primary_key in keys.items():
             yield primary_key
 
     @property
@@ -114,7 +111,7 @@ class Database(object):
             # Nestes casos irá acontecer um erro na recriação desta chave. Sendo assim é preciso ignorar esse erro.
             try:
                 self.create(key)
-            except fdb.fbcore.DatabaseError, e:
+            except fdb.fbcore.DatabaseError as e:
                 #if 'already exists' in e.args[0]:
                 #    logging.info(
                 #        'Erro ao tentar criar chave primária {0}. Chave já existe.'.
@@ -243,7 +240,7 @@ class Database(object):
         try:
             cursor.execute(sql)
             self.db.commit()
-        except fdb.fbcore.DatabaseError, e:
+        except fdb.fbcore.DatabaseError as e:
             logging.debug("Erro ao remover {0} {1}".format(object_types[ttype], name))
             logging.debug('  ' + repr(e))
             self.db.rollback()
@@ -404,7 +401,7 @@ class Database(object):
         for tablename, fieldname, comment in column_comments:
             tablename = tablename.strip()
             fieldname = fieldname.strip()
-            comment = comment.strip().decode('latin1', 'ignore')
+            comment = comment.strip() #.decode('latin1', 'ignore')
             #logging.info("Adicionando comentário no campo {} da tabela {}".format(fieldname, tablename))
             notify_progress()
             try:
@@ -417,7 +414,7 @@ class Database(object):
         logging.info("Sincronizando comentários das tabelas")
         for tablename, comment in table_comments:
             tablename = tablename.strip()
-            comment = comment.strip().decode('latin1', 'ignore')
+            comment = comment.strip() #.decode('latin1', 'ignore')
             #logging.info("Adicionando comentário na tabela {}".format(tablename))
             notify_progress()
             self.cursor.execute("COMMENT ON TABLE {} IS '{}'".format(tablename, comment))

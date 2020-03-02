@@ -1,7 +1,3 @@
-# encoding: utf8
-from __future__ import unicode_literals
-from __future__ import print_function
-
 import re
 import logging
 from fdb.fbcore import DatabaseError
@@ -16,19 +12,19 @@ def cria_chave_estrangeira(conn, ddl):
             conn.execute_immediate(ddl)
             conn.commit()
             break
-        except DatabaseError, e:
+        except DatabaseError as e:
             conn.rollback()
-            logging.error(e[0])
-            print("")
-            print("Instrução que causou o problema:\n")
-            print(ddl)
-            print("")
-            print("Faça a correção manual no banco de dados.")
-            print("Após isso, pressione ENTER para tentar novamente")
-            raw_input()
-            #nome_tabela = extrai_nome_tabela(e[0])
-            #clausula_where = extrai_clausula_where(e[0])
-            #remove_registro(conn, nome_tabela, clausula_where)
+            #logging.error(e[0])
+            #print("")
+            #print("Instrução que causou o problema:\n")
+            #print(ddl)
+            #print("")
+            #print("Faça a correção manual no banco de dados.")
+            #print("Após isso, pressione ENTER para tentar novamente")
+            #raw_input()
+            nome_tabela = extrai_nome_tabela(e.args[0])
+            clausula_where = extrai_clausula_where(e.args[0])
+            remove_registro(conn, nome_tabela, clausula_where)
 
 
 def extrai_nome_tabela(error_msg):
@@ -53,7 +49,7 @@ def remove_registro(conn, nome_tabela, clausula_where):
             cursor.execute(sql)
             conn.commit()
             break;
-        except DatabaseError, e:
+        except DatabaseError as e:
             conn.rollback()
             nome_tabela2 = extrai_nome_tabela(e[0])
             clausula_where2 = extrai_clausula_where(e[0])
@@ -67,5 +63,3 @@ if __name__=="__main__":
     cria_chave_estrangeira(conn, '''\
 ALTER TABLE TREGREGISTROFORMA ADD CONSTRAINT TREGREGISTROFORMA_FK6
 FOREIGN KEY (EMPRESA,IDBAIXARECEBER) REFERENCES TRECBAIXA (EMPRESA,IDBAIXA)''')
-
-    

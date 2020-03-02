@@ -5,6 +5,9 @@ def setup_config(debug=False):
         
     logging.basicConfig(
         level=logging_level,
-        #format='%(asctime)s - %(message)s',
-        format='=> %(message)s',
-        datefmt='%H:%M:%S')
+        format='%(asctime)s - %(message)s',
+        #filename='schema_equalizer.log',
+        #format='%(message)s',
+        datefmt='%H:%M:%S'
+        
+    )

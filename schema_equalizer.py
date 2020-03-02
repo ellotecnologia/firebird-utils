@@ -1,7 +1,3 @@
-# coding: utf8
-from __future__ import unicode_literals
-from __future__ import print_function
-
 import sys
 import argparse
 import logging
@@ -103,8 +99,8 @@ if __name__ == "__main__":
     config.setup_config(args.debug)
     
     if not (args.ORIGEM and args.DESTINO):
-        args.ORIGEM = raw_input('Informe o caminho do banco de dados BOM: ')
-        args.DESTINO = raw_input('Informe o caminho do banco de dados ZUADO: ')
+        args.ORIGEM = input('Informe o caminho do banco de dados BOM: ')
+        args.DESTINO = input('Informe o caminho do banco de dados ZUADO: ')
     
     main(args)
-    raw_input('')    
+    #raw_input('')    
