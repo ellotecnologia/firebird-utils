@@ -1,5 +1,6 @@
 import fdb
 import fdb.fbcore
+import fdb.schema
 import logging
 import monkey_patch_fdb
 from fb_foreign_keys import cria_chave_estrangeira
@@ -144,7 +145,22 @@ class Database(object):
         logging.info("Recriando Views")
         for view in views:
             notify_progress()
-            self.create(view)
+            self.create_view(view)
+
+    def create_view(self, view):
+        """ Creates a View
+            Creates dependent views if necessary.
+        """
+        if self.view_exists(view):
+            return
+        logging.debug('Criando view {}'.format(view.name))
+        for dependency in view.get_dependencies():
+            if dependency.depended_on is fdb.schema.View:
+                self.create_view(dependency.depended_on)
+        self.create(view)
+
+    def view_exists(self, view):
+        return self.db.schema.get_view(view.name) is not None
 
     def recreate_procedures(self, procedures):
         logging.info("Recriando Procedures")
