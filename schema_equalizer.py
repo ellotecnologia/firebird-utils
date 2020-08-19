@@ -2,6 +2,8 @@ import sys
 import argparse
 import logging
 
+import fdb
+
 import config
 import firebird
 
@@ -101,6 +103,10 @@ if __name__ == "__main__":
     if not (args.ORIGEM and args.DESTINO):
         args.ORIGEM = input('Informe o caminho do banco de dados BOM: ')
         args.DESTINO = input('Informe o caminho do banco de dados ZUADO: ')
-    
-    main(args)
-    #raw_input('')    
+
+    try:
+        main(args)
+    except fdb.DatabaseError as e:
+        print(e.args[0])
+
+    #raw_input('')
