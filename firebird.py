@@ -155,11 +155,12 @@ class Database(object):
             return
         logging.debug('Criando view {}'.format(view.name))
         for dependency in view.get_dependencies():
-            if dependency.depended_on is fdb.schema.View:
-                self.create_view(dependency.depended_on)
+            if isinstance(dependency.depended_on, fdb.schema.ViewColumn):
+                self.create_view(dependency.depended_on.view)
         self.create(view)
 
     def view_exists(self, view):
+        self.schema.reload() # tem que recarregar o schema
         return self.db.schema.get_view(view.name) is not None
 
     def recreate_procedures(self, procedures):
@@ -261,7 +262,7 @@ class Database(object):
             logging.debug('  ' + repr(e))
             self.db.rollback()
             return False
-        logging.debug("-> {0}".format(sql))
+        #logging.debug("-> {0}".format(sql))
         return True
 
     def _get_dependencies(self, object_name):
@@ -376,7 +377,7 @@ class Database(object):
         self.db.commit()
                 
     def execute(self, stmt):
-        logging.debug(stmt)
+        #logging.debug(stmt)
         self.cursor.execute(stmt)
     
     def create_field(self, table, field, field_name=None):
