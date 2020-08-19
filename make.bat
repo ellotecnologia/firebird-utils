@@ -1,2 +1,2 @@
 @echo off
-pyinstaller --onefile --hidden-import fdb schema_equalizer.py 
+pyinstaller --onefile --noupx --hidden-import fdb schema_equalizer.py 
