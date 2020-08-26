@@ -8,7 +8,7 @@ import config
 import firebird
 
 
-__VERSION__ = "1.2.1"
+__VERSION__ = "1.2.2"
 
 
 def main(args):
@@ -26,6 +26,7 @@ def main(args):
     dst.drop_foreign_keys()
     dst.drop_indices()
     dst.drop_primary_keys()
+    dst.drop_constraints()
     dst.drop_triggers()
     dst.drop_views()
     dst.drop_procedures()
@@ -37,6 +38,7 @@ def main(args):
     
     dst.create_generators(src.generators)
     
+    dst.recreate_constraints(src.constraints)
     dst.recreate_primary_keys(src.primary_keys)
     dst.recreate_foreign_keys(src.foreign_keys)
     

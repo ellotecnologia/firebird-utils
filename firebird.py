@@ -63,6 +63,12 @@ class Database(object):
                 yield index
 
     @property
+    def constraints(self):
+        for constraint in self.db.schema.constraints:
+            if constraint.constraint_type == 'UNIQUE':
+                yield constraint
+
+    @property
     def column_comments(self):
         self.cursor.execute(
             "SELECT a.RDB$RELATION_NAME, a.RDB$FIELD_NAME, a.RDB$DESCRIPTION "
@@ -181,6 +187,13 @@ class Database(object):
             notify_progress()
             self.create(index)
 
+    def recreate_constraints(self, constraints):
+        logging.info("Recriando Restrições (constraints)")
+        for constraint in constraints:
+            notify_progress()
+            logging.debug('Recriando constraint {}'.format(constraint.name))
+            self.create(constraint)
+
     def create_generators(self, generators):
         logging.info("Recriando Generators")
         ours_generators = [gen.name for gen in self.generators]
@@ -198,6 +211,17 @@ class Database(object):
         for index in self.indices:
             notify_progress()
             instruction = "DROP INDEX {}".format(index.name)
+            self.execute(instruction)
+        self.db.commit()
+
+    def drop_constraints(self):
+        """ Drop all UNIQUE constraints
+        """
+        logging.info("Removendo todas as restrições (constraints)")
+        for constraint in self.constraints:
+            notify_progress()
+            logging.debug('Removendo constraint {}'.format(constraint.name))
+            instruction = "ALTER TABLE {} DROP CONSTRAINT {}".format(constraint.table.name, constraint.name)
             self.execute(instruction)
         self.db.commit()
 
@@ -377,7 +401,6 @@ class Database(object):
         self.db.commit()
                 
     def execute(self, stmt):
-        #logging.debug(stmt)
         self.cursor.execute(stmt)
     
     def create_field(self, table, field, field_name=None):
