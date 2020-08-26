@@ -374,8 +374,7 @@ class Database(object):
                     
     def sync_field(self, table, reference_field):
         """ Sincroniza a estrutura de um campo """
-        logging.info('')
-        logging.info('Campo {}.{} está incompatível com banco de referência, ajustando...'.format(table.name, reference_field.name))
+        logging.info('Campo {}.{} está diferente do banco de referência, ajustando...'.format(table.name, reference_field.name))
         fieldname = reference_field.name
         tmp_fieldname = fieldname + '_1'
         
@@ -383,20 +382,20 @@ class Database(object):
         # na tabela que estiverem com o valor null para este campo.
         if not reference_field.isnullable():
             default_value = reference_field.default or "''"
-            logging.info('Definindo valor default para o campo {}, aguarde...'.format(fieldname))
+            logging.debug('Definindo valor default para o campo {}, aguarde...'.format(fieldname))
             self.execute('UPDATE {} SET {}={} WHERE {} IS NULL'.format(table.name, fieldname, default_value, fieldname))
             self.db.commit()
         
-        logging.info('Criando campo temporário {}.{}'.format(table.name, tmp_fieldname))
+        logging.debug('Criando campo temporário {}.{}'.format(table.name, tmp_fieldname))
         self.create_field(table, reference_field, tmp_fieldname)
         
-        logging.info('Sincroniza valores do campo {} com o campo {}, aguarde...'.format(fieldname, tmp_fieldname))
+        logging.debug('Sincroniza valores do campo {} com o campo {}, aguarde...'.format(fieldname, tmp_fieldname))
         self.execute('UPDATE {} SET {}={}'.format(table.name, tmp_fieldname, fieldname))
         
-        logging.info('Removendo campo {}'.format(fieldname))
+        logging.debug('Removendo campo {}'.format(fieldname))
         self.execute('ALTER TABLE {} DROP {}'.format(table.name, fieldname))
         
-        logging.info('Renomeando campo {} para {}'.format(tmp_fieldname, fieldname))
+        logging.debug('Renomeando campo {} para {}'.format(tmp_fieldname, fieldname))
         self.execute('ALTER TABLE {} ALTER {} TO {}'.format(table.name, tmp_fieldname, fieldname))
         self.db.commit()
                 
