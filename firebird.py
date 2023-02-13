@@ -266,8 +266,11 @@ class Database(object):
         cursor = self.db.cursor()
         object_name = name.strip()
         object_types = {
+            # 0: 'TABLE',
             1: 'VIEW',
             2: 'TRIGGER',
+            # 3: 'computed column',
+            # 4: 'CHECK constraint',
             5: 'PROCEDURE',
             99: 'EXTERNAL FUNCTION'
         }
@@ -275,6 +278,7 @@ class Database(object):
             notify_progress()
             dname = dname.strip()
             if dname == object_name: continue
+            if dtype == 3: continue
             self.drop_object_and_dependencies(dname, dtype)
 
         sql = 'DROP {0} {1}'.format(object_types[ttype], object_name)
