@@ -17,12 +17,12 @@ def main(args):
     """
     src_connection = firebird.create_connection(args.ORIGEM)
     dst_connection = firebird.create_connection(args.DESTINO)
-    
+
     src = firebird.Database(src_connection)
     dst = firebird.Database(dst_connection)
-    
+
     dst.sync_fielddefs = not args.disable_fieldsync
-    
+
     dst.drop_foreign_keys()
     dst.drop_indices()
     dst.drop_primary_keys()
@@ -31,29 +31,29 @@ def main(args):
     dst.drop_views()
     dst.drop_procedures()
     dst.drop_functions()
-    
+
     dst.create_missing_tables(src.tables)
     dst.remove_dangling_tables(src)
     dst.sync_tables_structure(src.tables)
-    
+
     dst.create_generators(src.generators)
-    
+
     dst.recreate_constraints(src.constraints)
     dst.recreate_primary_keys(src.primary_keys)
     dst.recreate_foreign_keys(src.foreign_keys)
-    
+
     dst.recreate_empty_procedures(src.procedures)
     dst.recreate_functions(src.functions)
     dst.recreate_views(src.views)
     dst.recreate_procedures(src.procedures)
     dst.recreate_triggers(src.triggers)
     dst.recreate_indices(src.indices)
-    
+
     dst.synchronize_comments(src)
     # TODO: Apply grants
-    
+
     sincroniza_sequencial_release(src_connection, dst_connection)
-    
+
     logging.info("")
     logging.info("Processo finalizado com sucesso!")
 
@@ -63,26 +63,30 @@ def sincroniza_sequencial_release(src_connection, dst_connection):
     """
     src_cursor = src_connection.cursor()
     dst_cursor = dst_connection.cursor()
-    
+
     src_cursor.execute("SELECT CAST(Valor AS VARCHAR(5)) "
                        "FROM TGerParametros "
                        "WHERE parametro='GERIDSCRIPTRELEASE'")
-    ultimo_id = src_cursor.fetchone()[0]
+    row = src_cursor.fetchone()
+    if not row:
+        return
+
+    ultimo_id = row[0]
 
     logging.info("Atualizando sequencial de Release para {}".format(ultimo_id))
 
     # Remove o parâmetro antes
     dst_cursor.execute("DELETE FROM TGerParametros WHERE Parametro='GERIDSCRIPTRELEASE'")
-    
+
     # Pega o Id do próximo parâmetro
     dst_cursor.execute("SELECT COALESCE(MAX(IdParametro), 0) + 1 FROM TGerParametros")
     idparametro = dst_cursor.fetchone()[0]
-    
+
     dst_cursor.execute("INSERT INTO TGERPARAMETROS (IDPARAMETRO, PARAMETRO, VALOR) "
                        "VALUES ({}, 'GERIDSCRIPTRELEASE', '{}')".format(idparametro, ultimo_id))
     dst_connection.commit()
-    
-    
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Utilitário de Equalização de Banco de Dados Firebird")
     parser.add_argument('--debug', action="store_true", default=False, help="Ativa modo debug")
@@ -92,7 +96,7 @@ def parse_args():
     parser.add_argument('DESTINO', nargs='?')
     return parser.parse_args()
 
-    
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -101,7 +105,7 @@ if __name__ == "__main__":
         sys.exit()
 
     config.setup_config(args.debug)
-    
+
     if not (args.ORIGEM and args.DESTINO):
         args.ORIGEM = input('Informe o caminho do banco de dados BOM: ')
         args.DESTINO = input('Informe o caminho do banco de dados ZUADO: ')
