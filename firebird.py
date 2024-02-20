@@ -381,6 +381,8 @@ class Database(object):
         logging.info('Campo {}.{} está diferente do banco de referência, ajustando...'.format(table.name, reference_field.name))
         fieldname = reference_field.name
         tmp_fieldname = fieldname + '_1'
+        if len(tmp_fieldname) > 31: # 31 é o tamanho máximo permitido para o nome de um campo no firebird
+            tmp_fieldname = 'temp_field'
         
         # Se o campo não aceitar NULL é necessário antes corrigir os registros
         # na tabela que estiverem com o valor null para este campo.
