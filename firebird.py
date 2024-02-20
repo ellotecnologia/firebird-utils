@@ -412,7 +412,7 @@ class Database(object):
         logging.debug('Criando campo {}.{}'.format(table.name, field_name))
         stmt = "ALTER TABLE {} ADD {} {} ".format(table.name, field_name, field.datatype)
         if field.has_default():
-            stmt += "DEFAULT {}".format(field.default)
+            stmt += "DEFAULT {} ".format(field.default)
         if not field.isnullable():
             stmt += "NOT NULL "
         self.execute(stmt)
