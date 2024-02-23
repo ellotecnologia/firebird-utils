@@ -7,7 +7,7 @@ from fb_foreign_keys import cria_chave_estrangeira
 from progress import notify_progress
 
 
-def create_connection(database_path, username='sysdba', password='masterkey'):
+def create_connection(database_path, username='sysdba', password='masterkey') -> fdb.fbcore.Connection:
     return fdb.connect(database_path, username, password)
 
 
@@ -103,12 +103,12 @@ class Database(object):
             self.execute(instruction)
         self.db.commit()
 
-    def recreate_foreign_keys(self, foreign_keys):
+    def recreate_foreign_keys(self, foreign_keys, src_connection):
         logging.info("Recriando Chaves Estrangeiras")
         for foreign_key in foreign_keys:
             notify_progress()
             logging.debug("Recriando Foreign Key {0}".format(foreign_key.name))
-            cria_chave_estrangeira(self.db, foreign_key.get_sql_for('create'))
+            cria_chave_estrangeira(self.db, src_connection, foreign_key.get_sql_for('create'))
 
     def recreate_primary_keys(self, keys):
         logging.info("Recriando Chaves Primárias")

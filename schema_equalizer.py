@@ -40,7 +40,7 @@ def main(args):
 
     dst.recreate_constraints(src.constraints)
     dst.recreate_primary_keys(src.primary_keys)
-    dst.recreate_foreign_keys(src.foreign_keys)
+    dst.recreate_foreign_keys(src.foreign_keys, src_connection)
 
     dst.recreate_empty_procedures(src.procedures)
     dst.recreate_functions(src.functions)
