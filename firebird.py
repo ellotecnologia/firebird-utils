@@ -4,6 +4,7 @@ import fdb.schema
 import logging
 import monkey_patch_fdb
 from fb_foreign_keys import cria_chave_estrangeira
+from fb_foreign_keys import remove_registros_orfas
 from progress import notify_progress
 
 
@@ -81,7 +82,8 @@ class Database(object):
     def table_comments(self):
         self.cursor.execute("SELECT RDB$RELATION_NAME, RDB$DESCRIPTION "
                             "FROM RDB$RELATIONS "
-                            "WHERE RDB$DESCRIPTION IS NOT NULL", )
+                            "WHERE RDB$DESCRIPTION IS NOT NULL "
+                            "AND RDB$RELATION_TYPE = 0", ) #RELATION_TYPE `0` é somente as tabelas
         rows = self.cursor.fetchall()
         return rows
 
@@ -102,6 +104,76 @@ class Database(object):
             instruction = key.get_sql_for('drop')
             self.execute(instruction)
         self.db.commit()
+
+    def get_dependencies(self, table_name: str) -> list:
+        """ Return a list of tables that `table_name` depends on """
+
+        self.cursor.execute(" \
+                            SELECT rc_2.rdb$relation_name \
+                            FROM \
+                               (select  \
+                                  idx.rdb$relation_name \
+                                  ,idx.rdb$foreign_key AS fk \
+                               FROM rdb$relation_constraints rc, rdb$indices idx \
+                               WHERE \
+                                  (idx.rdb$index_name = rc.rdb$index_name) and \
+                                  (rc.rdb$constraint_type = 'FOREIGN KEY') \
+                               order by rc.rdb$relation_name \
+                               ) source \
+                            JOIN rdb$relation_constraints rc_2 \
+                               ON rc_2.rdb$constraint_name = source.fk \
+                            WHERE \
+                               Source.rdb$relation_name = {dependent_name} \
+                            GROUP BY 1 \
+                            ".format(dependent_name=repr(table_name))
+                            )
+        resultado = []
+        for row in self.cursor.fetchall():
+           resultado.append(row[0].strip())
+        return resultado
+
+    def get_dependents_tables(self, table_name: str) -> list:
+        """ Return a list of tables that depend on `table_name` """
+        
+        stmt = "SELECT idx_2.rdb$relation_name \
+                FROM ( \
+                   SELECT \
+                      idx.rdb$index_name as index_name \
+                      ,idx.rdb$relation_name as relation_name \
+                   FROM rdb$relation_constraints rc, rdb$indices idx \
+                   WHERE \
+                      (idx.rdb$index_name = rc.rdb$index_name) and \
+                      (rc.RDB$CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE')) and \
+                      idx.rdb$relation_name = {depends_table} \
+                   ORDER BY rc.rdb$relation_name \
+                   ) source \
+                JOIN rdb$indices idx_2 \
+                   ON idx_2.rdb$foreign_key = source.index_name \
+                GROUP BY 1 \
+                ".format(depends_table=repr((table_name)))
+        
+        self.cursor.execute(stmt)
+
+        resultado = []
+        for row in self.cursor.fetchall():
+           resultado.append(row[0].strip())
+        return resultado
+
+    def remove_orphaned_records(self, tables, src):
+        """ Remove all orphaned records for each table """
+
+        logging.info("Removendo registros orfãs")
+        for table in tables:
+            fks = table.foreign_keys
+            for fk in fks:
+                remove_registros_orfas(fk, self.db)
+
+            for dependent_table in src.get_dependents_tables(table.name):
+                dt = src.db.schema.get_table(dependent_table)
+                fks = dt.foreign_keys
+                for fk in fks:
+                    if fk.partner_constraint.table.name == table.name:
+                        remove_registros_orfas(fk, self.db)
 
     def recreate_foreign_keys(self, foreign_keys, src_connection):
         logging.info("Recriando Chaves Estrangeiras")
@@ -462,7 +534,9 @@ class Database(object):
             comment = comment.strip() #.decode('latin1', 'ignore')
             #logging.info("Adicionando comentário na tabela {}".format(tablename))
             notify_progress()
-            self.cursor.execute("COMMENT ON TABLE {} IS '{}'".format(tablename, comment))
+            stmt = "COMMENT ON TABLE {} IS '{}'".format(tablename, comment)
+            logging.info(stmt)
+            self.cursor.execute(stmt)
         self.db.commit()
 
     def __contains__(self, item):

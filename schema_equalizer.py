@@ -23,6 +23,7 @@ def main(args):
 
     dst.sync_fielddefs = not args.disable_fieldsync
 
+    dst.remove_orphaned_records(src.tables, src)
     dst.drop_foreign_keys()
     dst.drop_indices()
     dst.drop_primary_keys()

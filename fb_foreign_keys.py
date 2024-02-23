@@ -2,6 +2,8 @@ import re
 import logging
 from fdb.fbcore import DatabaseError
 from fdb.fbcore import Connection
+from fdb.schema import Constraint
+
 
 def cria_chave_estrangeira(conn_dst: Connection, conn_src: Connection, ddl: str):
     """ Tenta recriar uma foreign key.
@@ -47,12 +49,10 @@ def extrai_clausula_where(error_msg) -> tuple:
     #     return ""
 
 def remove_registro(conn_dst, conn_src, nome_tabela: str, clausula_where: str):
-    cursor = conn_dst.cursor()
     sql = "delete from {0} where {1}".format(nome_tabela, clausula_where)
     logging.info(sql)
     while True:
         try:
-            # cursor.execute_immediate(sql)
             conn_dst.execute_immediate(sql)
             conn_dst.commit()
             break
@@ -64,7 +64,7 @@ def remove_registro(conn_dst, conn_src, nome_tabela: str, clausula_where: str):
             clausula_where2 = compoe_clausula_where(campos2, valores2)
             remove_registro(conn_dst, conn_src, nome_tabela2, clausula_where2)
 
-def compoe_clausula_where(campos: tuple, valores: tuple):
+def compoe_clausula_where(campos: tuple|list, valores: tuple|list):
     i = 0
     clausula = ''
     while i < len(campos):
@@ -73,7 +73,7 @@ def compoe_clausula_where(campos: tuple, valores: tuple):
         if clausula == '':
             clausula = nome_campo + '=' + valor
         else:
-            clausula = clausula + ' and ' + nome_campo + '=' + valor
+            clausula = clausula + ' AND ' + nome_campo + '=' + valor
         i += 1
     return clausula
 
@@ -103,6 +103,124 @@ def obtem_campos_origem(fk_name: str, conn: Connection) -> tuple:
         resultado.append(linha[0].strip())
 
     return tuple(resultado)
+
+
+def obtem_clausula_left_join(tabela_referenciada: str, campos_dependentes, campos_refenciados, alias_r) -> str:
+    clausula = ''
+    qtde_campos = len(campos_dependentes)
+    i = 0
+    while i < qtde_campos:
+        if clausula == '':
+            clausula  = 'LEFT JOIN {}\n   ON {} = {} '.format(tabela_referenciada + ' ' + alias_r, campos_dependentes[i], campos_refenciados[i])
+        else: 
+            clausula += '\nAND {} = {} '.format(campos_dependentes[i], campos_refenciados[i])
+        i += 1
+
+    return clausula
+
+def compoe_clausula_select(campos) -> str:
+    clausula = ''
+    qtde_campos = len(campos)
+
+    while qtde_campos > 0:
+        if clausula == '':
+            clausula += 'SELECT\n' + campos[-qtde_campos]
+        else:
+            clausula += ',\n' + campos[-qtde_campos]
+
+        qtde_campos -= 1
+    
+    return clausula
+    
+def compoe_clausula_where_2(condicionais: dict) -> str:
+    clausula = ''
+    
+    for campo, valor in condicionais.items():
+        if (valor == None): 
+            op = ' '
+            valor = 'IS NULL'
+        elif (valor == 'IS NULL') or (valor == 'IS NOT NULL'):
+            op = ' '
+        else:
+            op = '='
+
+        if clausula == '':
+            clausula = campo + op + str(valor)
+        else:
+            clausula += '\n' + ' AND ' + campo + op + str(valor)
+
+    return clausula
+
+def remove_registros_orfas(fk: Constraint, conn: Connection):
+    alias_r = 'ref'
+    tabela_refenciada = fk.partner_constraint.table.get_quoted_name()
+    campos_referenciados = fk.partner_constraint.index.segment_names.copy()
+    
+    alias_d = 'dep'
+    tabela_dependente = fk.table.get_quoted_name()
+    campos_dependentes = fk.index.segment_names.copy()
+
+    for campo in campos_referenciados:
+        campos_referenciados[campos_referenciados.index(campo)] =  alias_r + '.' + campo
+
+    for campo in campos_dependentes:
+        campos_dependentes[campos_dependentes.index(campo)] =  alias_d + '.' + campo
+
+    select = """
+        {clausula_select}
+        FROM {dependente} {alias}
+        {clausula_join}
+        WHERE
+            {clausula_where}
+    """
+    c_select = compoe_clausula_select(campos_dependentes)
+    condicionais = {}
+    for campo in campos_referenciados:
+        condicionais[campo] = 'IS NULL'
+    for campo in campos_dependentes:
+        condicionais[campo] = 'IS NOT NULL'
+    c_where = compoe_clausula_where_2(condicionais)
+
+    select = select.format(clausula_select=c_select, dependente=tabela_dependente, alias=alias_d, \
+                          clausula_join=obtem_clausula_left_join(tabela_refenciada, campos_dependentes, campos_referenciados, alias_r), \
+                          clausula_where=c_where)
+    
+    cur = conn.cursor()
+    cur.execute(select)
+    dados = cur.fetchallmap()
+
+    stmt = 'DELETE FROM ' + tabela_dependente + ' WHERE {}'
+    i = 0
+    j = 1
+    condicionais = {}
+    for linha in dados:
+        for campo, valor in linha.items():
+            tipo_campo = fk.table.get_column(campo).datatype
+            if ('VARCHAR' in tipo_campo) or ('CHAR' in tipo_campo):
+                valor = repr(valor)    
+
+            if not campo in condicionais:
+                condicionais[campo]=[str(valor)]
+            else:
+                condicionais[campo].append(str(valor))
+            i += 1
+
+        if (i == 1500) or (j == len(dados)) :
+            c_where = ''
+            for key, value in condicionais.items():
+                if c_where == '':
+                    c_where = key + ' IN ' + '({})'
+                    c_where = c_where.format(','.join(set(value)))
+                else:
+                    c_where += '\n AND '+ key + ' IN ' + '({})'.format(','.join(set(value)))
+            # Limpa os valores dos campos que já foram executados no banco
+            for value in condicionais.values():
+                value.clear()
+            i = 0
+            logging.info('Revomendo registros orfãs: ' + stmt.format(c_where))
+            conn.execute_immediate(stmt.format(c_where))
+            conn.commit()
+        j += 1
 
 if __name__=="__main__":
     import fdb
