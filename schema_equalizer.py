@@ -8,7 +8,7 @@ import config
 import firebird
 
 
-__VERSION__ = "1.2.3"
+__VERSION__ = "1.2.4"
 
 
 def main(args):
