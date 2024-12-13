@@ -14,6 +14,9 @@ def create_connection(database_path, username='sysdba', password='masterkey') ->
 
 def fields_are_different(field_a, field_b):
     """ Returns True if fields are different """
+    if field_a.iscomputed():
+       return False
+
     return (field_a.datatype != field_b.datatype) \
            or (field_a.isnullable() != field_b.isnullable()) \
            or (field_a.has_default() != field_b.has_default()) \
