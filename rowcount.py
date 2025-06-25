@@ -1,7 +1,7 @@
 import sys
 import fdb
 
-con = fdb.connect(dsn=sys.argv[1])
+con = fdb.connect(dsn=sys.argv[1], user='sysdba', password='1234')
 cur = con.cursor()
 
 tabelas = {}
@@ -13,7 +13,7 @@ for table in con.schema.tables:
     try:
         count = cur.fetchone()[0]
     except:
-        print '--> %s' % tablename
+        print('--> %s' % tablename)
 
     if count == 0: continue
 
@@ -21,8 +21,8 @@ for table in con.schema.tables:
     tabelas[count] = tablename
 
 keys = tabelas.keys()
-keys.sort()
+#keys.sort()
 
 for k in keys:
-    print tabelas[k], k
+    print(tabelas[k], k)
 
