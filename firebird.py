@@ -522,7 +522,7 @@ class Database(object):
             tablename = tablename.strip()
             fieldname = fieldname.strip()
             comment = comment.strip() #.decode('latin1', 'ignore')
-            #logging.info("Adicionando comentário no campo {} da tabela {}".format(fieldname, tablename))
+            logging.info("Adicionando comentário no campo {} da tabela {}".format(fieldname, tablename))
             notify_progress()
             try:
                 self.cursor.execute("COMMENT ON COLUMN {}.{} IS '{}'".format(tablename, fieldname, comment))
@@ -535,11 +535,14 @@ class Database(object):
         for tablename, comment in table_comments:
             tablename = tablename.strip()
             comment = comment.strip() #.decode('latin1', 'ignore')
-            #logging.info("Adicionando comentário na tabela {}".format(tablename))
+            logging.info("Adicionando comentário na tabela {}".format(tablename))
             notify_progress()
-            stmt = "COMMENT ON TABLE {} IS '{}'".format(tablename, comment)
-            logging.info(stmt)
-            self.cursor.execute(stmt)
+            try:
+                stmt = "COMMENT ON TABLE {} IS '{}'".format(tablename, comment)
+                logging.debug(stmt)
+                self.cursor.execute(stmt)
+            except fdb.fbcore.DatabaseError as e:
+                logging.info('{} {}'.format(tablename, comment))
         self.db.commit()
 
     def __contains__(self, item):
