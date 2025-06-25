@@ -1,5 +1,8 @@
 import re
 import logging
+
+from typing import Union
+
 from fdb.fbcore import DatabaseError
 from fdb.fbcore import Connection
 from fdb.schema import Constraint
@@ -64,7 +67,7 @@ def remove_registro(conn_dst, conn_src, nome_tabela: str, clausula_where: str):
             clausula_where2 = compoe_clausula_where(campos2, valores2)
             remove_registro(conn_dst, conn_src, nome_tabela2, clausula_where2)
 
-def compoe_clausula_where(campos: tuple|list, valores: tuple|list):
+def compoe_clausula_where(campos: Union[tuple, list], valores: Union[tuple, list]):
     i = 0
     clausula = ''
     while i < len(campos):
